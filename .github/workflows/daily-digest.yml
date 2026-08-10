@@ -4,7 +4,7 @@ on:
   schedule:
     # cronはUTC。日本時間から9時間引く。毎朝 JST 5:52 = UTC 20:52（前日）
     # 実行時刻を変えるのはこの1行だけ
-    - cron: '52 20 * * *'
+    - cron: '37 20 * * *'
 permissions:
   contents: write           # processed-items.json のコミットバックに必要
 
