@@ -14,7 +14,6 @@
   "dependencies": {
     "@google/genai": "^1.0.0",
     "dotenv": "^16.4.5",
-    "resend": "^4.0.0",
     "rss-parser": "^3.13.0"
   }
 }

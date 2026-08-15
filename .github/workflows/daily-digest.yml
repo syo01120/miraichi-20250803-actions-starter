@@ -1,20 +1,21 @@
-name: daily-digest
+name: publish-note-pages
+
 on:
-  workflow_dispatch:        # Actionsタブから手動実行できる
+  workflow_dispatch: # Actionsタブから手動実行できる
   schedule:
-    # cronはUTC。日本時間から9時間引く。毎朝 JST 5:22 = UTC 20:22（前日）
-    # 実行時刻を変えるのはこの1行だけ
-    - cron: '22 20 * * *'
-permissions:
-  contents: write           # processed-items.json のコミットバックに必要
+    # cronはUTC。毎朝 JST 5:07 = UTC 20:07（前日）
+    - cron: "7 20 * * *"
 
 concurrency:
-  group: daily-digest      # 定期実行と手動実行が重なっても同時に走らせない（二重送信の防止）
+  group: pages
   cancel-in-progress: false
 
 jobs:
-  run-digest:
+  build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # 掲載済み記事データのコミットバックに必要
+      pages: read # configure-pagesがPages設定を確認するために必要
     steps:
       - name: リポジトリをチェックアウト
         uses: actions/checkout@v4
@@ -28,35 +29,46 @@ jobs:
       - name: 依存関係をインストール
         run: npm ci
 
-      - name: Secretsの設定を確認
+      - name: Secretの設定を確認
         run: |
-          missing=""
-          if [ -z "$GEMINI_API_KEY" ]; then missing="$missing GEMINI_API_KEY"; fi
-          if [ -z "$RESEND_API_KEY" ]; then missing="$missing RESEND_API_KEY"; fi
-          if [ -z "$EMAIL_FROM" ]; then missing="$missing EMAIL_FROM"; fi
-          if [ -z "$EMAIL_TO" ]; then missing="$missing EMAIL_TO"; fi
-          if [ -n "$missing" ]; then
-            echo "以下のSecretsが設定されていません（値は表示しません）:$missing"
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "GEMINI_API_KEY が設定されていません（値は表示しません）"
             exit 1
           fi
-          echo "必要なSecretsはすべて設定されています"
+          echo "必要なSecretは設定されています"
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
-          EMAIL_TO: ${{ secrets.EMAIL_TO }}
 
-      - name: 情報収集・要約・メール送信を実行
+      - name: RSS収集・要約・静的ページ生成を実行
         run: node src/index.js
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           AI_MODEL: ${{ secrets.AI_MODEL }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
-          EMAIL_TO: ${{ secrets.EMAIL_TO }}
 
-      - name: 処理済み記事の記録をコミットバック
+      - name: 掲載済み記事データをコミットバック
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git diff --quiet -- data/processed-items.json || (git add data/processed-items.json && git commit -m "更新: 処理済み記事の記録" && git push)
+          git diff --quiet -- data/site-items.json || (git add data/site-items.json && git commit -m "更新: GitHub Pages掲載記事" && git push)
+
+      - name: GitHub Pagesを設定
+        uses: actions/configure-pages@v5
+
+      - name: GitHub Pages用ファイルをアップロード
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: GitHub Pagesへ公開
+        id: deployment
+        uses: actions/deploy-pages@v4

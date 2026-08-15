@@ -1,7 +1,7 @@
 {
   "maxItems": 15,
+  "maxSiteItems": 60,
   "language": "ja",
-  "sendEmail": true,
   "includeRss": true,
   "includeYouTube": false,
   "includeNote": false,

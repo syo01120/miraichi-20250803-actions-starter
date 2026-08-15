@@ -1,78 +1,65 @@
-# GitHub Actions ではじめる情報収集の自動化
+# note新着記事をGitHub Pagesへ自動公開
 
-**毎朝、気になる情報の要約が自分のメールに届く仕組み**を、サーバーを用意せずに作ります。
-
-MIRAICHI セミナー（2026年8月3日）の教材リポジトリです。
+登録したRSSから新着記事を集め、Geminiで日本語要約を作り、GitHub Pagesへ毎朝公開します。メールとResendは使用しません。
 
 ```text
-GitHub Actions が決まった時間に動く
+GitHub Actions（毎朝5:07ごろ）
         ↓
-RSS から新着記事を取りに行く
+登録したRSSから新着記事を取得
         ↓
-生成AI が日本語で要約する
+未掲載の記事だけGeminiで要約
         ↓
-Resend で自分のメールアドレスへ送る
-        ↓
-毎朝、要約が届く
+静的HTMLを生成してGitHub Pagesへ公開
 ```
-
-## このリポジトリでやること・やらないこと
-
-**やること**
-
-- GitHub Actions を「決まった時間にプログラムを動かす仕組み」として使う
-- RSS から新着記事を取得する
-- 生成AI（Gemini）で日本語の要約を作る
-- Resend でHTMLメールを自分宛に送る
-- APIキーを GitHub Secrets で安全に管理する
-
-**やらないこと**
-
-このセミナーでは、GitHub Actions の CI/CD（テスト自動化・ビルド・デプロイ）は扱いません。エンジニア向けの詳しい使い方ではなく、**情報収集の自動化に使える定期実行の仕組み**として紹介します。
-
-## 費用について
-
-小規模な個人利用であれば、各サービスの無料枠を活用して始めやすい構成にしています。ただし GitHub Actions・Gemini API・Resend にはそれぞれ利用条件と上限があります。**「完全無料」「無制限で無料」ではありません。**利用前に各サービスの最新の条件を確認してください。
 
 ## 必要なもの
 
 | 項目 | 用途 |
 |---|---|
-| GitHub アカウント | このリポジトリをフォークして動かす |
-| メールアドレス | 要約の受け取り先 |
-| Gemini API キー | 記事の要約 |
-| Resend アカウント + APIキー | メールの送信 |
+| GitHubアカウント | ActionsとPagesの実行 |
+| Gemini APIキー | 記事の日本語要約 |
 
-## 使い方
+Resendアカウント、メールアドレス、`RESEND_API_KEY`、`EMAIL_FROM`、`EMAIL_TO`は不要です。
 
-まずは **[docs/setup-guide.md](docs/setup-guide.md)** を上から順にやってください。
+## 最初の設定
 
-- [docs/setup-guide.md](docs/setup-guide.md) — 最初にやること（キーの取得から Secrets 登録まで）
-- [docs/github-actions-overview.md](docs/github-actions-overview.md) — GitHub Actions の概要（4つだけ覚えれば動かせます）
-- [docs/resend-setup.md](docs/resend-setup.md) — Resend の設定
-- [docs/troubleshooting.md](docs/troubleshooting.md) — うまくいかないときの確認ポイント
+1. GitHubのリポジトリで **Settings → Pages** を開く
+2. **Build and deployment → Source** を **GitHub Actions** にする
+3. **Settings → Secrets and variables → Actions** で `GEMINI_API_KEY` を登録する
+4. **Actions → publish-note-pages → Run workflow** を実行する
+5. 実行完了後、**Settings → Pages** に表示されるURLを開く
 
-## 変更するのはこの5つだけ
+詳しい手順は [docs/setup-guide.md](docs/setup-guide.md) を参照してください。
 
-コードを書き換える必要はありません。触るのは次の5つです。
+## カスタマイズ
 
-1. 集める情報源（RSSのURL） — `config/sources.json`
-2. 1回に取得する件数 — `config/settings.json`
-3. 送信先のメールアドレス — GitHub Secrets
-4. 実行する時刻 — `.github/workflows/daily-digest.yml`
-5. APIキー — GitHub Secrets
+- RSS: `config/sources.json`
+- 1回に新規要約する上限: `config/settings.json` の `maxItems`
+- ページに表示する上限: `config/settings.json` の `maxSiteItems`
+- 実行時刻: `.github/workflows/daily-digest.yml`
 
-## ローカルで試す（任意・開発者向け）
+noteクリエイターのRSSは通常 `https://note.com/ユーザー名/rss` です。現在登録済みのRSSはそのまま引き継いでいます。
+
+## 掲載済み記事の管理
+
+`data/site-items.json` に記事URLと要約を最大500件保存します。掲載済みURLは次回以降に再要約しないため、Gemini APIの無駄な呼び出しを抑えられます。生成した `public/` はコミットせず、Actionsの成果物としてPagesへ直接デプロイします。
+
+## ローカル確認
 
 ```bash
 npm install
-npm run verify   # ユニットテスト + dry-run（メールは送信されません）
+npm test
+npm run dry-run
 ```
 
-## 講師
+`npm run dry-run` は実際のRSSへアクセスしますが、Gemini APIは呼びません。生成結果は `public/index.html` で確認できます。
 
-けいたろう（keitaro GAS Lab）
+## ドキュメント
+
+- [セットアップガイド](docs/setup-guide.md)
+- [GitHub Actionsの仕組み](docs/github-actions-overview.md)
+- [トラブルシューティング](docs/troubleshooting.md)
 
 ## ライセンス
 
-セミナー配布用のサンプルです。各自の環境に合わせて自由に調整してください。
+セミナー配布用のサンプルを、GitHub Pages出力向けに調整したものです。
