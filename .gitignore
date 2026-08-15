@@ -14,5 +14,5 @@ _archive/
 # スライド作業中の一時レンダリング
 slides/pdf/*.png
 
-# dry-runで生成されるメールプレビュー（ローカル確認用・コミット不要）
-data/email-preview.html
+# GitHub Pagesへデプロイする生成物（Actionsで毎回生成する）
+public/

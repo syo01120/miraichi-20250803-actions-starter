@@ -77,7 +77,7 @@ export async function summarizeItems(items, options = {}) {
     } catch (err) {
       log?.error(`要約に失敗しました: ${item.title}（原因: ${err.message}）`);
       // 失敗した記事はsummaryをnullにし、summaryFailedフラグを立てる。
-      // メールには載せず、processed-items.jsonにも記録しない（次回実行で再試行させるため）。
+      // サイトには載せず、掲載済みデータにも記録しない（次回実行で再試行させるため）。
       results.push({ ...item, summary: null, summaryFailed: true });
     }
   }

@@ -1,79 +1,48 @@
 # トラブルシューティング
 
-うまく動かないときは、まず**実行ログ**を見ます。
+まず **Actions → publish-note-pages → 失敗した実行** を開き、赤いステップのログを確認します。
 
-**Actions タブ → 失敗した実行（赤い×）→ digest → 「情報収集 → 要約 → メール送信」** を開くと、
-エラーの内容が文章で出ています。以下から当てはまるものを探してください。
+## `GEMINI_API_KEY が設定されていません`
 
-## Actionsタブに実行ボタンが出ない
+**Settings → Secrets and variables → Actions** に、名前が完全一致する `GEMINI_API_KEY` を登録します。値をログやソースコードへ貼り付けないでください。
 
-**原因**: フォーク直後はActionsが無効になっている。
+## RSSの取得件数が0件
 
-**対処**: Actionsタブを開き、「I understand my workflows, go ahead and enable them」ボタンを押して有効化する。
+- `config/sources.json` が正しいJSONか確認する
+- RSS URLをブラウザで開けるか確認する
+- noteの場合は `https://note.com/ユーザー名/rss` の形式か確認する
+- 一部のRSSだけ失敗している場合は、ログに表示された情報源を修正または削除する
 
-## 「環境変数 XXX が設定されていません」
+## 要約に失敗する
 
-**原因**: Secretsの登録漏れ、または Name のつづり間違い。
+- Gemini APIキーが有効か確認する
+- APIの利用上限を確認する
+- `AI_MODEL` を指定している場合は、現在利用可能なモデル名か確認する
 
-**対処**: Settings → Secrets and variables → Actions を開き、次の4つが**正確にこの名前で**あるか確認する。
+一部だけ失敗した場合、その記事は掲載済みにしないため次回に再試行されます。
 
-```text
-GEMINI_API_KEY
-RESEND_API_KEY
-EMAIL_FROM
-EMAIL_TO
+## `configure-pages` または `deploy-pages` が失敗する
+
+1. **Settings → Pages** を開く
+2. **Build and deployment → Source** が **GitHub Actions** か確認する
+3. **Settings → Actions → General → Workflow permissions** でActionsの実行が組織ポリシーにより制限されていないか確認する
+4. フォークの場合はActions自体が有効か確認する
+
+## 実行成功なのにページが見つからない
+
+初回デプロイ後、**Settings → Pages** に公開URLが表示されます。プロジェクトPagesは通常、ルートURLではなく `/リポジトリ名/` 以下です。
+
+## 新着が反映されない
+
+- Actionsの最終実行時刻を確認する
+- ログの「新しく掲載する記事」が0件なら、そのURLは既に `data/site-items.json` にあります
+- 同じ記事を再処理したい場合は、該当URLのレコードだけを `data/site-items.json` から削除して手動実行する
+
+## ローカルで確認する
+
+```bash
+npm test
+npm run dry-run
 ```
 
-よくある間違い: `GEMINI_APIKEY`（アンダースコア不足）、前後の空白、小文字。
-
-## 「Gemini API HTTP 400 / 403」
-
-**原因**: APIキーの値が間違っている、またはキーの初回有効化が済んでいない。
-
-**対処**: Google AI Studio でキーを確認し、必要なら数分待ってから再実行する。Secretsの `GEMINI_API_KEY` を **Update** で登録し直す場合は値の貼り直しが確実（再表示はされない）。
-
-## 「Gemini API HTTP 429」
-
-**原因**: 無料枠のリクエスト上限に達した。上限には2種類あります。
-
-- **1分あたりの回数（RPM）** — 無料枠では 5回/分 程度。記事を連続で要約すると超えやすい
-- **1日あたりの回数（RPD）** — その日の総量。超えると翌日まで回復しない
-
-**対処**: 1分あたりの上限については、要約と要約の間に**13秒の待ち時間**を入れて回避しています（[src/services/summarizer.js](../src/services/summarizer.js)）。そのため記事が多いほど実行時間は延びます（15件で約3分）。
-
-それでも429が出る場合:
-
-- `config/settings.json` の `maxItems` を減らす（1回の消費が減る）
-- 環境変数 `AI_INTERVAL_MS` で待ち時間を長くする（例: `20000` で20秒）
-- 1日あたりの上限に達している場合は、時間をおかず翌日まで待つ
-
-なお、要約に失敗した記事は**その回のメールから除外されるだけ**で、処理済みには記録されません。次回の実行で自動的に再試行されます。
-
-## 「Resend API HTTP 401 / 403」
-
-**原因**: `RESEND_API_KEY` の値の誤り、または送信元・送信先の制限。
-
-**対処**:
-- Resendの API Keys でキーを確認して登録し直す
-- `EMAIL_FROM` は `onboarding@resend.dev`、`EMAIL_TO` は**Resendに登録した自分のメールアドレス**にする
-
-## 「RSS取得に失敗したため XXX をスキップします」
-
-**原因**: `config/sources.json` のURLが間違っている、またはRSSを提供していないページのURLを入れている。
-
-**対処**: ブラウザでそのURLを開き、XML（`<rss>` や `<feed>` で始まる文字だらけのページ）が表示されるか確認する。表示されなければRSSのURLではない。
-
-## 実行は緑✓なのにメールが届かない
-
-**確認する順番**:
-1. 迷惑メールフォルダを見る
-2. ログに「新着なしのため送信をスキップ」と出ていないか — 新着記事がなかっただけ（`data/processed-items.json` に記録済みの記事は再送されません）
-3. `config/settings.json` の `sendEmail` が `false` になっていないか確認
-
-## 決まった時刻に実行されない
-
-GitHubのスケジュール実行（cron）は混雑状況で**数分〜数十分遅れることがあります**。分単位で正確な定刻実行はできません。cronの時刻は**UTC**（日本時間−9時間）で書く点にも注意してください。また、リポジトリに60日間更新がないとスケジュール実行は自動で無効化されます。
-
----
-
-解決しないときは、実行ログのエラー行のスクリーンショットを添えて質問してください。
+`npm run dry-run` 後に `public/index.html` をブラウザで開きます。ドライランではGemini APIを使わず、確認用の仮要約を表示します。
